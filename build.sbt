@@ -70,7 +70,7 @@ lazy val modules = Seq(
   game, gathering, study, user, puzzle, analyse,
   report, pref, chat, playban, lobby, mailer, oauth,
   // level 6
-  insight, evaluation, storm,
+  insight, evaluation, storm, openingPractice,
   // level 7
   // everything else is free from deps; do the big ones first
   relay, security, tournament, plan, round,
@@ -142,6 +142,11 @@ lazy val cms = module("cms",
 lazy val puzzle = module("puzzle",
   Seq(tree, memo, rating),
   tests.bundle
+)
+
+lazy val openingPractice = module("openingPractice",
+  Seq(common, db, memo),
+  Seq()
 )
 
 lazy val storm = module("storm",
