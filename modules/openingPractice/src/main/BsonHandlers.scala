@@ -26,7 +26,7 @@ object BsonHandlers:
   // NonEmptyList[OpeningLineId] handler - stores as space-separated string
   given lineIdNelHandler: BSONHandler[NonEmptyList[OpeningLineId]] = tryHandler[NonEmptyList[OpeningLineId]](
     { case BSONString(str) =>
-      str.split(' ').toList.map(OpeningLineId.apply).toNel.toTry("Empty line list")
+      str.split(' ').toList.filter(_.nonEmpty).map(OpeningLineId.apply).toNel.toTry("Empty line list")
     },
     lineIds => BSONString(lineIds.toList.map(_.value).mkString(" "))
   )

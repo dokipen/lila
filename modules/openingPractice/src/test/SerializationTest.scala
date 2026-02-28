@@ -146,11 +146,10 @@ class SerializationTest extends munit.FunSuite:
     val lineIds = summon[BSONHandler[NonEmptyList[OpeningLineId]]].readTry(bson).get
     assertEquals(lineIds.toList.map(_.value), List("line1", "line2", "line3"))
 
-  test("NonEmptyList[OpeningLineId] BSON deserialization handles empty string"):
+  test("NonEmptyList[OpeningLineId] BSON deserialization rejects empty string"):
     val bson = BSONString("")
-    val lineIds = summon[BSONHandler[NonEmptyList[OpeningLineId]]].readTry(bson).get
-    // Empty string splits to one empty string, which becomes OpeningLineId("")
-    assertEquals(lineIds.toList.map(_.value), List(""))
+    val result = summon[BSONHandler[NonEmptyList[OpeningLineId]]].readTry(bson)
+    assert(result.isFailure, "Should fail on empty line list")
 
   test("Color BSON serialization - white"):
     val bson = summon[BSONHandler[Color]].writeTry(Color.White).get
