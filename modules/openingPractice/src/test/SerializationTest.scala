@@ -10,6 +10,10 @@ class SerializationTest extends munit.FunSuite:
   import BsonHandlers.{ given }
   import OpeningPracticeJson.{ given }
 
+  // Helper to create AnnotatedMove without comment
+  def move(uci: String): AnnotatedMove = AnnotatedMove(Uci(uci).get, None)
+  def move(uci: String, comment: String): AnnotatedMove = AnnotatedMove(Uci(uci).get, Some(comment))
+
   // Test fixtures
   val testFamilyId = OpeningFamilyId("italian-game")
   val testGroupId = OpeningGroupId("giuoco-piano")
@@ -27,12 +31,12 @@ class SerializationTest extends munit.FunSuite:
     name = "Classical Variation",
     eco = Some("C53"),
     moves = NonEmptyList.of(
-      Uci("e2e4").get,
-      Uci("e7e5").get,
-      Uci("g1f3").get,
-      Uci("b8c6").get,
-      Uci("f1c4").get,
-      Uci("f8c5").get
+      move("e2e4", "Controls the center"),
+      move("e7e5"),
+      move("g1f3", "Develops knight, attacks e5"),
+      move("b8c6"),
+      move("f1c4"),
+      move("f8c5")
     ),
     description = Some("The main line of the Italian Game")
   )
@@ -42,10 +46,10 @@ class SerializationTest extends munit.FunSuite:
     name = "Evans Gambit",
     eco = Some("C51"),
     moves = NonEmptyList.of(
-      Uci("e2e4").get,
-      Uci("e7e5").get,
-      Uci("g1f3").get,
-      Uci("b8c6").get
+      move("e2e4"),
+      move("e7e5"),
+      move("g1f3"),
+      move("b8c6")
     ),
     description = None
   )
@@ -99,34 +103,43 @@ class SerializationTest extends munit.FunSuite:
 
   // BSON Structure Tests
 
-  test("NonEmptyList[Uci] BSON serialization - space-separated string"):
+  test("AnnotatedMove BSON round-trip without comment"):
+    val m = move("e2e4")
+    val bson = summon[BSONDocumentHandler[AnnotatedMove]].writeTry(m).get
+    val restored = summon[BSONDocumentHandler[AnnotatedMove]].readTry(bson).get
+    assertEquals(restored, m)
+    // Should not have comment field
+    assert(bson.getAsOpt[String]("comment").isEmpty)
+
+  test("AnnotatedMove BSON round-trip with comment"):
+    val m = move("e2e4", "Controls the center")
+    val bson = summon[BSONDocumentHandler[AnnotatedMove]].writeTry(m).get
+    val restored = summon[BSONDocumentHandler[AnnotatedMove]].readTry(bson).get
+    assertEquals(restored, m)
+    assertEquals(bson.getAsOpt[String]("comment"), Some("Controls the center"))
+
+  test("NonEmptyList[AnnotatedMove] BSON serialization - array of documents"):
     val moves = NonEmptyList.of(
-      Uci("e2e4").get,
-      Uci("e7e5").get,
-      Uci("g1f3").get
+      move("e2e4", "Center control"),
+      move("e7e5"),
+      move("g1f3")
     )
-    val bson = summon[BSONHandler[NonEmptyList[Uci]]].writeTry(moves).get
+    val bson = summon[BSONHandler[NonEmptyList[AnnotatedMove]]].writeTry(moves).get
     bson match
-      case BSONString(str) =>
-        assertEquals(str, "e2e4 e7e5 g1f3")
+      case BSONArray(values) =>
+        assertEquals(values.size, 3)
       case _ =>
-        fail("Expected BSONString for UCI moves")
+        fail("Expected BSONArray for annotated moves")
 
-  test("NonEmptyList[Uci] BSON deserialization from space-separated string"):
-    val bson = BSONString("e2e4 e7e5 g1f3")
-    val moves = summon[BSONHandler[NonEmptyList[Uci]]].readTry(bson).get
-    assertEquals(moves.toList.map(_.uci), List("e2e4", "e7e5", "g1f3"))
-
-  test("NonEmptyList[Uci] BSON deserialization filters out invalid UCI"):
-    val bson = BSONString("e2e4 invalid g1f3")
-    val moves = summon[BSONHandler[NonEmptyList[Uci]]].readTry(bson).get
-    // Invalid UCI strings are filtered out by flatMap
-    assertEquals(moves.toList.map(_.uci), List("e2e4", "g1f3"))
-
-  test("NonEmptyList[Uci] BSON deserialization rejects empty list"):
-    val bson = BSONString("")
-    val result = summon[BSONHandler[NonEmptyList[Uci]]].readTry(bson)
-    assert(result.isFailure, "Should fail on empty move list")
+  test("NonEmptyList[AnnotatedMove] BSON deserialization"):
+    val bson = BSONArray(
+      BSONDocument("uci" -> "e2e4", "comment" -> "Opens"),
+      BSONDocument("uci" -> "e7e5")
+    )
+    val moves = summon[BSONHandler[NonEmptyList[AnnotatedMove]]].readTry(bson).get
+    assertEquals(moves.toList.map(_.uci.uci), List("e2e4", "e7e5"))
+    assertEquals(moves.head.comment, Some("Opens"))
+    assertEquals(moves.toList(1).comment, None)
 
   test("NonEmptyList[OpeningLineId] BSON serialization - space-separated string"):
     val lineIds = NonEmptyList.of(
@@ -210,7 +223,12 @@ class SerializationTest extends munit.FunSuite:
 
     val moves = (obj \ "moves").as[JsArray]
     assertEquals(moves.value.size, 6)
-    assertEquals(moves.value.map(_.as[String]).toList, List("e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "f8c5"))
+    // First move has comment
+    assertEquals((moves(0) \ "uci").as[String], "e2e4")
+    assertEquals((moves(0) \ "comment").as[String], "Controls the center")
+    // Second move has no comment
+    assertEquals((moves(1) \ "uci").as[String], "e7e5")
+    assert((moves(1) \ "comment").toOption.isEmpty)
 
   test("OpeningLine JSON structure without description"):
     val json = Json.toJson(testLineNoDescription)
@@ -223,7 +241,9 @@ class SerializationTest extends munit.FunSuite:
 
     val moves = (obj \ "moves").as[JsArray]
     assertEquals(moves.value.size, 4)
-    assertEquals(moves.value.map(_.as[String]).toList, List("e2e4", "e7e5", "g1f3", "b8c6"))
+    // Moves without comments
+    assertEquals((moves(0) \ "uci").as[String], "e2e4")
+    assert((moves(0) \ "comment").toOption.isEmpty)
 
   test("OpeningGroup JSON structure"):
     val json = Json.toJson(testGroup)
@@ -252,19 +272,32 @@ class SerializationTest extends munit.FunSuite:
     val prereqs = (obj \ "prerequisites").as[JsArray]
     assertEquals(prereqs.value.size, 0)
 
-  test("NonEmptyList[Uci] JSON serialization - array format"):
+  test("AnnotatedMove JSON serialization"):
+    val m1 = move("e2e4", "Opens the game")
+    val json1 = Json.toJson(m1)
+    assertEquals((json1 \ "uci").as[String], "e2e4")
+    assertEquals((json1 \ "comment").as[String], "Opens the game")
+
+    val m2 = move("e7e5")
+    val json2 = Json.toJson(m2)
+    assertEquals((json2 \ "uci").as[String], "e7e5")
+    assert((json2 \ "comment").toOption.isEmpty, "Comment should be omitted when None")
+
+  test("NonEmptyList[AnnotatedMove] JSON serialization - array format"):
     val moves = NonEmptyList.of(
-      Uci("e2e4").get,
-      Uci("e7e5").get,
-      Uci("g1f3").get
+      move("e2e4", "Center"),
+      move("e7e5"),
+      move("g1f3")
     )
     val json = Json.toJson(moves)
     json match
       case JsArray(values) =>
         assertEquals(values.size, 3)
-        assertEquals(values.map(_.as[String]).toList, List("e2e4", "e7e5", "g1f3"))
+        assertEquals((values(0) \ "uci").as[String], "e2e4")
+        assertEquals((values(0) \ "comment").as[String], "Center")
+        assertEquals((values(1) \ "uci").as[String], "e7e5")
       case _ =>
-        fail("Expected JsArray for UCI moves")
+        fail("Expected JsArray for annotated moves")
 
   test("NonEmptyList[OpeningLineId] JSON serialization - array format"):
     val lineIds = NonEmptyList.of(
@@ -303,7 +336,7 @@ class SerializationTest extends munit.FunSuite:
       id = OpeningLineId("single"),
       name = "Single Move",
       eco = Some("A00"),
-      moves = NonEmptyList.of(Uci("e2e4").get),
+      moves = NonEmptyList.of(move("e2e4")),
       description = None
     )
 
@@ -316,7 +349,7 @@ class SerializationTest extends munit.FunSuite:
     val json = Json.toJson(singleMoveLine)
     val moves = (json \ "moves").as[JsArray]
     assertEquals(moves.value.size, 1)
-    assertEquals(moves.value.head.as[String], "e2e4")
+    assertEquals((moves(0) \ "uci").as[String], "e2e4")
 
   test("OpeningGroup with single line"):
     val singleLineGroup = OpeningGroup(
@@ -361,16 +394,16 @@ class SerializationTest extends munit.FunSuite:
       name = "Complex Line",
       eco = Some("B99"),
       moves = NonEmptyList.of(
-        Uci("e2e4").get,
-        Uci("c7c5").get,
-        Uci("g1f3").get,
-        Uci("d7d6").get,
-        Uci("d2d4").get,
-        Uci("c5d4").get,
-        Uci("f3d4").get,
-        Uci("g8f6").get,
-        Uci("b1c3").get,
-        Uci("a7a6").get
+        move("e2e4"),
+        move("c7c5"),
+        move("g1f3"),
+        move("d7d6"),
+        move("d2d4"),
+        move("c5d4"),
+        move("f3d4"),
+        move("g8f6"),
+        move("b1c3"),
+        move("a7a6")
       ),
       description = Some("A very long description with special characters: é, ñ, ü, and symbols like & < >")
     )
@@ -380,9 +413,9 @@ class SerializationTest extends munit.FunSuite:
     val restored = summon[BSONDocumentHandler[OpeningLine]].readTry(bson).get
     assertEquals(restored, complexLine)
 
-    // Verify BSON moves are space-separated
-    val movesBson = bson.getAsTry[BSONString]("moves").get
-    assertEquals(movesBson.value, "e2e4 c7c5 g1f3 d7d6 d2d4 c5d4 f3d4 g8f6 b1c3 a7a6")
+    // Verify BSON moves are array of documents
+    val movesBson = bson.getAsTry[BSONArray]("moves").get
+    assertEquals(movesBson.values.size, 10)
 
     // JSON structure
     val json = Json.toJson(complexLine)
@@ -395,7 +428,7 @@ class SerializationTest extends munit.FunSuite:
       id = OpeningLineId("community-trap"),
       name = "Custom Trap Line",
       eco = None,
-      moves = NonEmptyList.of(Uci("e2e4").get, Uci("e7e5").get),
+      moves = NonEmptyList.of(move("e2e4"), move("e7e5")),
       description = Some("A community-contributed trap")
     )
 

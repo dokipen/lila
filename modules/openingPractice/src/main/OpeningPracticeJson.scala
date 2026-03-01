@@ -2,7 +2,6 @@ package lila.openingPractice
 
 import play.api.libs.json.*
 import chess.Color
-import chess.format.Uci
 
 object OpeningPracticeJson:
 
@@ -11,9 +10,14 @@ object OpeningPracticeJson:
   given Writes[OpeningGroupId] = Writes(id => JsString(id.value))
   given Writes[OpeningLineId] = Writes(id => JsString(id.value))
 
-  // NonEmptyList[Uci] writer - convert to list of UCI strings
-  given uciNelWrites: Writes[NonEmptyList[Uci]] = Writes { nel =>
-    JsArray(nel.toList.map(uci => JsString(uci.uci)))
+  // AnnotatedMove writer - object with uci and optional comment
+  given OWrites[AnnotatedMove] = OWrites { move =>
+    Json.obj("uci" -> move.uci.uci).add("comment" -> move.comment)
+  }
+
+  // NonEmptyList[AnnotatedMove] writer
+  given annotatedMovesWrites: Writes[NonEmptyList[AnnotatedMove]] = Writes { nel =>
+    JsArray(nel.toList.map(Json.toJson(_)))
   }
 
   // NonEmptyList[OpeningLineId] writer

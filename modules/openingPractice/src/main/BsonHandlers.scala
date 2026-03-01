@@ -15,12 +15,28 @@ object BsonHandlers:
   given BSONHandler[OpeningGroupId] = stringAnyValHandler[OpeningGroupId](_.value, OpeningGroupId.apply)
   given BSONHandler[OpeningLineId] = stringAnyValHandler[OpeningLineId](_.value, OpeningLineId.apply)
 
-  // NonEmptyList[Uci] handler - stores as space-separated string
-  given uciNelHandler: BSONHandler[NonEmptyList[Uci]] = tryHandler[NonEmptyList[Uci]](
-    { case BSONString(str) =>
-      str.split(' ').toList.flatMap(Uci.apply).toNel.toTry("Empty move list")
+  // AnnotatedMove handler - stores as document with uci and optional comment
+  given BSONDocumentHandler[AnnotatedMove] = new BSONDocumentHandler[AnnotatedMove]:
+    def readDocument(doc: BSONDocument) =
+      for
+        uciStr <- doc.getAsTry[String]("uci")
+        uci <- Uci(uciStr).toTry(s"Invalid UCI: $uciStr")
+        comment = doc.getAsOpt[String]("comment")
+      yield AnnotatedMove(uci, comment)
+
+    def writeTry(move: AnnotatedMove) = Success(
+      BSONDocument("uci" -> move.uci.uci) ++ move.comment.fold(BSONDocument())(c => BSONDocument("comment" -> c))
+    )
+
+  // NonEmptyList[AnnotatedMove] handler - stores as array of documents
+  given annotatedMovesHandler: BSONHandler[NonEmptyList[AnnotatedMove]] = tryHandler[NonEmptyList[AnnotatedMove]](
+    { case BSONArray(values) =>
+      values.toList
+        .traverse(v => summon[BSONDocumentHandler[AnnotatedMove]].readTry(v.asInstanceOf[BSONDocument]).toOption)
+        .flatMap(_.toNel)
+        .toTry("Empty or invalid move list")
     },
-    moves => BSONString(moves.toList.map(_.uci).mkString(" "))
+    moves => BSONArray(moves.toList.map(m => summon[BSONDocumentHandler[AnnotatedMove]].writeTry(m).get))
   )
 
   // NonEmptyList[OpeningLineId] handler - stores as space-separated string
