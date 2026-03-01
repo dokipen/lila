@@ -9,6 +9,7 @@ object OpeningPracticeJson:
   given Writes[OpeningFamilyId] = Writes(id => JsString(id.value))
   given Writes[OpeningGroupId] = Writes(id => JsString(id.value))
   given Writes[OpeningLineId] = Writes(id => JsString(id.value))
+  given Writes[UserId] = Writes(id => JsString(id.value))
 
   // AnnotatedMove writer - object with uci and optional comment
   given OWrites[AnnotatedMove] = OWrites { move =>
@@ -62,5 +63,61 @@ object OpeningPracticeJson:
       "lines" -> group.lines,
       "color" -> group.color,
       "prerequisites" -> group.prerequisites
+    )
+  }
+
+  // PracticeMode writer
+  given Writes[PracticeMode] = Writes {
+    case PracticeMode.Learning => JsString("learning")
+    case PracticeMode.Drilling => JsString("drilling")
+    case PracticeMode.Timed    => JsString("timed")
+  }
+
+  // LineStatus writer
+  given Writes[LineStatus] = Writes {
+    case LineStatus.NotStarted => JsString("notStarted")
+    case LineStatus.Learning   => JsString("learning")
+    case LineStatus.Learned    => JsString("learned")
+    case LineStatus.Mastered   => JsString("mastered")
+  }
+
+  // Progress statistics writers
+  given OWrites[DrillingStats] = OWrites { stats =>
+    Json.obj(
+      "currentStreak" -> stats.currentStreak,
+      "bestStreak" -> stats.bestStreak,
+      "totalDrills" -> stats.totalDrills
+    )
+  }
+
+  given OWrites[TimedStats] = OWrites { stats =>
+    Json
+      .obj("totalAttempts" -> stats.totalAttempts)
+      .add("bestScore" -> stats.bestScore)
+      .add("bestTimeMs" -> stats.bestTimeMs)
+  }
+
+  given OWrites[LineProgress] = OWrites { progress =>
+    Json.obj(
+      "status" -> progress.status,
+      "attempts" -> progress.attempts,
+      "mistakes" -> progress.mistakes,
+      "drilling" -> progress.drilling,
+      "timed" -> progress.timed
+    )
+    .add("lastMistakeAt" -> progress.lastMistakeAt.map(_.toMillis))
+  }
+
+  given OWrites[UserOpeningProgress] = OWrites { progress =>
+    Json.obj(
+      "id" -> progress.id,
+      "currentMode" -> progress.currentMode,
+      "createdAt" -> progress.createdAt.toMillis,
+      "updatedAt" -> progress.updatedAt.toMillis,
+      "lines" -> JsObject(
+        progress.lines.map { case (lineId, lineProgress) =>
+          lineId.value -> Json.toJsObject(lineProgress)
+        }
+      )
     )
   }

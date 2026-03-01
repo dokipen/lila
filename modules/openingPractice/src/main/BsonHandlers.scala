@@ -6,7 +6,7 @@ import reactivemongo.api.bson.*
 
 import scala.util.Success
 
-import lila.db.dsl.*
+import lila.db.dsl.{ *, given }
 
 object BsonHandlers:
 
@@ -73,3 +73,48 @@ object BsonHandlers:
   given BSONDocumentHandler[OpeningLine] = Macros.handler
 
   given BSONDocumentHandler[OpeningGroup] = Macros.handler
+
+  // PracticeMode enum handler
+  given BSONHandler[PracticeMode] = tryHandler[PracticeMode](
+    {
+      case BSONString("learning") => Success(PracticeMode.Learning)
+      case BSONString("drilling") => Success(PracticeMode.Drilling)
+      case BSONString("timed")    => Success(PracticeMode.Timed)
+      case v                      => handlerBadValue(s"Invalid practice mode: $v")
+    },
+    {
+      case PracticeMode.Learning => BSONString("learning")
+      case PracticeMode.Drilling => BSONString("drilling")
+      case PracticeMode.Timed    => BSONString("timed")
+    }
+  )
+
+  // LineStatus enum handler
+  given BSONHandler[LineStatus] = tryHandler[LineStatus](
+    {
+      case BSONString("notStarted") => Success(LineStatus.NotStarted)
+      case BSONString("learning")   => Success(LineStatus.Learning)
+      case BSONString("learned")    => Success(LineStatus.Learned)
+      case BSONString("mastered")   => Success(LineStatus.Mastered)
+      case v                        => handlerBadValue(s"Invalid line status: $v")
+    },
+    {
+      case LineStatus.NotStarted => BSONString("notStarted")
+      case LineStatus.Learning   => BSONString("learning")
+      case LineStatus.Learned    => BSONString("learned")
+      case LineStatus.Mastered   => BSONString("mastered")
+    }
+  )
+
+  // Progress statistics handlers
+  given BSONDocumentHandler[DrillingStats] = Macros.handler
+
+  given BSONDocumentHandler[TimedStats] = Macros.handler
+
+  given BSONDocumentHandler[LineProgress] = Macros.handler
+
+  // Map handler for line progress
+  given lineProgressMapHandler: BSONHandler[Map[OpeningLineId, LineProgress]] =
+    typedMapHandler[OpeningLineId, LineProgress]
+
+  given BSONDocumentHandler[UserOpeningProgress] = Macros.handler
