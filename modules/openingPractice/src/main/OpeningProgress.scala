@@ -13,6 +13,8 @@ enum LineStatus:
   case Learning
   case Learned
   case Mastered
+  def isLearned = this == Learned || this == Mastered
+  def isMastered = this == Mastered
 
 // Statistics for drilling mode
 case class DrillingStats(
@@ -48,11 +50,8 @@ case class LineProgress(
       lastMistakeAt = Some(nowInstant)
     )
 
-  def isLearned: Boolean = status match
-    case LineStatus.Learned | LineStatus.Mastered => true
-    case _                                        => false
-
-  def isMastered: Boolean = status == LineStatus.Mastered
+  def isLearned: Boolean = status.isLearned
+  def isMastered: Boolean = status.isMastered
 
 // User's progress across all opening lines
 case class UserOpeningProgress(
