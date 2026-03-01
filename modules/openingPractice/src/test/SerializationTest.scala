@@ -442,3 +442,4 @@ class SerializationTest extends munit.FunSuite:
     val obj = json.as[JsObject]
     assert((obj \ "eco").toOption.isEmpty, "ECO should be omitted when None")
     assertEquals((obj \ "name").as[String], "Custom Trap Line")
+
