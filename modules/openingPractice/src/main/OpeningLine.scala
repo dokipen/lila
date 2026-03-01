@@ -5,7 +5,7 @@ import chess.format.Uci
 case class OpeningLine(
     id: OpeningLineId,
     name: String,
-    eco: String, // ECO code like "C45"
+    eco: Option[String], // ECO code like "C45", None for community content
     moves: NonEmptyList[Uci],
     description: Option[String]
 )

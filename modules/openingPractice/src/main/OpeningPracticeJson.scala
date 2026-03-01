@@ -43,9 +43,9 @@ object OpeningPracticeJson:
       .obj(
         "id" -> line.id,
         "name" -> line.name,
-        "eco" -> line.eco,
         "moves" -> line.moves
       )
+      .add("eco" -> line.eco)
       .add("description" -> line.description)
   }
 

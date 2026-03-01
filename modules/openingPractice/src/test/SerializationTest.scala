@@ -25,7 +25,7 @@ class SerializationTest extends munit.FunSuite:
   val testLine = OpeningLine(
     id = testLineId1,
     name = "Classical Variation",
-    eco = "C53",
+    eco = Some("C53"),
     moves = NonEmptyList.of(
       Uci("e2e4").get,
       Uci("e7e5").get,
@@ -40,7 +40,7 @@ class SerializationTest extends munit.FunSuite:
   val testLineNoDescription = OpeningLine(
     id = testLineId2,
     name = "Evans Gambit",
-    eco = "C51",
+    eco = Some("C51"),
     moves = NonEmptyList.of(
       Uci("e2e4").get,
       Uci("e7e5").get,
@@ -302,7 +302,7 @@ class SerializationTest extends munit.FunSuite:
     val singleMoveLine = OpeningLine(
       id = OpeningLineId("single"),
       name = "Single Move",
-      eco = "A00",
+      eco = Some("A00"),
       moves = NonEmptyList.of(Uci("e2e4").get),
       description = None
     )
@@ -359,7 +359,7 @@ class SerializationTest extends munit.FunSuite:
     val complexLine = OpeningLine(
       id = OpeningLineId("complex"),
       name = "Complex Line",
-      eco = "B99",
+      eco = Some("B99"),
       moves = NonEmptyList.of(
         Uci("e2e4").get,
         Uci("c7c5").get,
@@ -389,3 +389,23 @@ class SerializationTest extends munit.FunSuite:
     val moves = (json \ "moves").as[JsArray]
     assertEquals(moves.value.size, 10)
     assertEquals((json \ "description").as[String], "A very long description with special characters: é, ñ, ü, and symbols like & < >")
+
+  test("OpeningLine without ECO (community content)"):
+    val communityLine = OpeningLine(
+      id = OpeningLineId("community-trap"),
+      name = "Custom Trap Line",
+      eco = None,
+      moves = NonEmptyList.of(Uci("e2e4").get, Uci("e7e5").get),
+      description = Some("A community-contributed trap")
+    )
+
+    // BSON round-trip
+    val bson = summon[BSONDocumentHandler[OpeningLine]].writeTry(communityLine).get
+    val restored = summon[BSONDocumentHandler[OpeningLine]].readTry(bson).get
+    assertEquals(restored, communityLine)
+
+    // JSON structure - eco should be omitted
+    val json = Json.toJson(communityLine)
+    val obj = json.as[JsObject]
+    assert((obj \ "eco").toOption.isEmpty, "ECO should be omitted when None")
+    assertEquals((obj \ "name").as[String], "Custom Trap Line")
