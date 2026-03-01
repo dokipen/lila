@@ -466,13 +466,6 @@ class SerializationTest extends munit.FunSuite:
     val restored = summon[BSONHandler[PracticeMode]].readTry(bson).get
     assertEquals(restored, mode)
 
-  test("PracticeMode.Timed BSON round-trip"):
-    val mode = PracticeMode.Timed
-    val bson = summon[BSONHandler[PracticeMode]].writeTry(mode).get
-    assertEquals(bson, BSONString("timed"))
-    val restored = summon[BSONHandler[PracticeMode]].readTry(bson).get
-    assertEquals(restored, mode)
-
   test("PracticeMode BSON deserialization rejects invalid values"):
     val result = summon[BSONHandler[PracticeMode]].readTry(BSONString("invalid"))
     assert(result.isFailure, "Should fail on invalid practice mode")
@@ -543,40 +536,6 @@ class SerializationTest extends munit.FunSuite:
     assertEquals(updated.bestStreak, 10)
     assertEquals(updated.totalDrills, 21)
 
-  // TimedStats BSON round-trip and domain logic tests
-  test("TimedStats BSON round-trip"):
-    val stats = TimedStats(bestScore = Some(100), bestTimeMs = Some(5000L), totalAttempts = 10)
-    val bson = summon[BSONDocumentHandler[TimedStats]].writeTry(stats).get
-    val restored = summon[BSONDocumentHandler[TimedStats]].readTry(bson).get
-    assertEquals(restored, stats)
-
-  test("TimedStats empty state BSON round-trip"):
-    val stats = TimedStats()
-    val bson = summon[BSONDocumentHandler[TimedStats]].writeTry(stats).get
-    val restored = summon[BSONDocumentHandler[TimedStats]].readTry(bson).get
-    assertEquals(restored, stats)
-
-  test("TimedStats.withAttempt first attempt"):
-    val stats = TimedStats()
-    val updated = stats.withAttempt(100, 5000L)
-    assertEquals(updated.bestScore, Some(100))
-    assertEquals(updated.bestTimeMs, Some(5000L))
-    assertEquals(updated.totalAttempts, 1)
-
-  test("TimedStats.withAttempt better score"):
-    val stats = TimedStats(bestScore = Some(100), bestTimeMs = Some(5000L), totalAttempts = 5)
-    val updated = stats.withAttempt(150, 6000L)
-    assertEquals(updated.bestScore, Some(150))
-    assertEquals(updated.bestTimeMs, Some(5000L))
-    assertEquals(updated.totalAttempts, 6)
-
-  test("TimedStats.withAttempt better time"):
-    val stats = TimedStats(bestScore = Some(100), bestTimeMs = Some(5000L), totalAttempts = 5)
-    val updated = stats.withAttempt(90, 4000L)
-    assertEquals(updated.bestScore, Some(100))
-    assertEquals(updated.bestTimeMs, Some(4000L))
-    assertEquals(updated.totalAttempts, 6)
-
   // LineProgress BSON round-trip and domain logic tests
   test("LineProgress BSON round-trip"):
     val progress = LineProgress(
@@ -584,8 +543,7 @@ class SerializationTest extends munit.FunSuite:
       attempts = 5,
       mistakes = 2,
       lastMistakeAt = Some(testInstant),
-      drilling = DrillingStats(currentStreak = 3, bestStreak = 5, totalDrills = 10),
-      timed = TimedStats(bestScore = Some(100), bestTimeMs = Some(5000L), totalAttempts = 3)
+      drilling = DrillingStats(currentStreak = 3, bestStreak = 5, totalDrills = 10)
     )
     val bson = summon[BSONDocumentHandler[LineProgress]].writeTry(progress).get
     val restored = summon[BSONDocumentHandler[LineProgress]].readTry(bson).get
@@ -595,7 +553,6 @@ class SerializationTest extends munit.FunSuite:
     assertEquals(restored.mistakes, progress.mistakes)
     assertEquals(restored.lastMistakeAt.map(_.toMillis), progress.lastMistakeAt.map(_.toMillis))
     assertEquals(restored.drilling, progress.drilling)
-    assertEquals(restored.timed, progress.timed)
 
   test("LineProgress empty state BSON round-trip"):
     val progress = LineProgress()
@@ -759,8 +716,7 @@ class SerializationTest extends munit.FunSuite:
           attempts = 10,
           mistakes = 2,
           lastMistakeAt = Some(testInstant),
-          drilling = DrillingStats(currentStreak = 5, bestStreak = 10, totalDrills = 20),
-          timed = TimedStats(bestScore = Some(100), bestTimeMs = Some(5000L), totalAttempts = 5)
+          drilling = DrillingStats(currentStreak = 5, bestStreak = 10, totalDrills = 20)
         )
       ),
       currentMode = PracticeMode.Drilling,
@@ -788,11 +744,6 @@ class SerializationTest extends munit.FunSuite:
     assertEquals((drilling \ "bestStreak").as[Int], 10)
     assertEquals((drilling \ "totalDrills").as[Int], 20)
 
-    val timed = (line1 \ "timed").as[JsObject]
-    assertEquals((timed \ "bestScore").as[Int], 100)
-    assertEquals((timed \ "bestTimeMs").as[Long], 5000L)
-    assertEquals((timed \ "totalAttempts").as[Int], 5)
-
   test("UserOpeningProgress JSON empty state"):
     val progress = UserOpeningProgress.empty(testUserId)
     val json = Json.toJson(progress)
@@ -809,10 +760,3 @@ class SerializationTest extends munit.FunSuite:
     val obj = json.as[JsObject]
     assert((obj \ "lastMistakeAt").toOption.isEmpty, "lastMistakeAt should be omitted when None")
 
-  test("TimedStats JSON omits optional fields when None"):
-    val stats = TimedStats(totalAttempts = 5)
-    val json = Json.toJson(stats)
-    val obj = json.as[JsObject]
-    assertEquals((obj \ "totalAttempts").as[Int], 5)
-    assert((obj \ "bestScore").toOption.isEmpty, "bestScore should be omitted when None")
-    assert((obj \ "bestTimeMs").toOption.isEmpty, "bestTimeMs should be omitted when None")

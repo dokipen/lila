@@ -6,7 +6,6 @@ import reactivemongo.api.bson.Macros.Annotations.Key
 enum PracticeMode:
   case Learning
   case Drilling
-  case Timed
 
 // Status of a line in the learning process
 enum LineStatus:
@@ -32,27 +31,13 @@ case class DrillingStats(
   def afterMistake: DrillingStats =
     copy(currentStreak = 0, totalDrills = totalDrills + 1)
 
-// Statistics for timed mode
-case class TimedStats(
-    bestScore: Option[Int] = None,
-    bestTimeMs: Option[Long] = None,
-    totalAttempts: Int = 0
-):
-  def withAttempt(score: Int, timeMs: Long): TimedStats =
-    copy(
-      bestScore = Some(bestScore.fold(score)(math.max(_, score))),
-      bestTimeMs = Some(bestTimeMs.fold(timeMs)(math.min(_, timeMs))),
-      totalAttempts = totalAttempts + 1
-    )
-
 // Progress on a single opening line
 case class LineProgress(
     status: LineStatus = LineStatus.NotStarted,
     attempts: Int = 0,
     mistakes: Int = 0,
     lastMistakeAt: Option[Instant] = None,
-    drilling: DrillingStats = DrillingStats(),
-    timed: TimedStats = TimedStats()
+    drilling: DrillingStats = DrillingStats()
 ):
   def withAttempt: LineProgress =
     copy(attempts = attempts + 1)

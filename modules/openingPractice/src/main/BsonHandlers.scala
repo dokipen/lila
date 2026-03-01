@@ -79,13 +79,11 @@ object BsonHandlers:
     {
       case BSONString("learning") => Success(PracticeMode.Learning)
       case BSONString("drilling") => Success(PracticeMode.Drilling)
-      case BSONString("timed")    => Success(PracticeMode.Timed)
       case v                      => handlerBadValue(s"Invalid practice mode: $v")
     },
     {
       case PracticeMode.Learning => BSONString("learning")
       case PracticeMode.Drilling => BSONString("drilling")
-      case PracticeMode.Timed    => BSONString("timed")
     }
   )
 
@@ -108,8 +106,6 @@ object BsonHandlers:
 
   // Progress statistics handlers
   given BSONDocumentHandler[DrillingStats] = Macros.handler
-
-  given BSONDocumentHandler[TimedStats] = Macros.handler
 
   given BSONDocumentHandler[LineProgress] = Macros.handler
 

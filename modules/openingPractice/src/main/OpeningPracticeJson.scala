@@ -70,7 +70,6 @@ object OpeningPracticeJson:
   given Writes[PracticeMode] = Writes {
     case PracticeMode.Learning => JsString("learning")
     case PracticeMode.Drilling => JsString("drilling")
-    case PracticeMode.Timed    => JsString("timed")
   }
 
   // LineStatus writer
@@ -90,20 +89,12 @@ object OpeningPracticeJson:
     )
   }
 
-  given OWrites[TimedStats] = OWrites { stats =>
-    Json
-      .obj("totalAttempts" -> stats.totalAttempts)
-      .add("bestScore" -> stats.bestScore)
-      .add("bestTimeMs" -> stats.bestTimeMs)
-  }
-
   given OWrites[LineProgress] = OWrites { progress =>
     Json.obj(
       "status" -> progress.status,
       "attempts" -> progress.attempts,
       "mistakes" -> progress.mistakes,
-      "drilling" -> progress.drilling,
-      "timed" -> progress.timed
+      "drilling" -> progress.drilling
     )
     .add("lastMistakeAt" -> progress.lastMistakeAt.map(_.toMillis))
   }
