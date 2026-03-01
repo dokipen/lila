@@ -146,7 +146,7 @@ lazy val puzzle = module("puzzle",
 
 lazy val openingPractice = module("openingPractice",
   Seq(common, db, memo),
-  Seq()
+  tests.bundle
 )
 
 lazy val storm = module("storm",
