@@ -14,9 +14,9 @@ final class OpeningGroupRepo(
       coll.list[OpeningGroup]($empty, 500)
 
   def findById(id: OpeningGroupId): Fu[Option[OpeningGroup]] =
-    coll.byId[OpeningGroup](id.value)
+    allGroupsCache.get({}).map(_.find(_.id == id))
 
   def findByFamily(familyId: OpeningFamilyId): Fu[List[OpeningGroup]] =
-    coll.list[OpeningGroup]($doc("familyId" -> familyId))
+    allGroupsCache.get({}).map(_.filter(_.familyId == familyId))
 
   def listAll: Fu[List[OpeningGroup]] = allGroupsCache.get({})
