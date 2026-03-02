@@ -1,9 +1,10 @@
 package lila.openingPractice
 
 import chess.Color
+import reactivemongo.api.bson.Macros.Annotations.Key
 
 case class OpeningGroup(
-    id: OpeningGroupId,
+    @Key("_id") id: OpeningGroupId,
     name: String,
     familyId: OpeningFamilyId,
     tier: Int, // difficulty level

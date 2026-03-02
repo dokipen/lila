@@ -11,7 +11,7 @@ final class OpeningGroupRepo(
 
   private val allGroupsCache = cacheApi.unit[List[OpeningGroup]]:
     _.refreshAfterWrite(10.minutes).buildAsyncFuture: _ =>
-      coll.list[OpeningGroup]($empty)
+      coll.list[OpeningGroup]($empty, 500)
 
   def findById(id: OpeningGroupId): Fu[Option[OpeningGroup]] =
     coll.byId[OpeningGroup](id.value)

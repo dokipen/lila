@@ -105,7 +105,7 @@ class OpeningGroupRepoTest extends munit.FunSuite:
     assertEquals(familyIdInBson, Some("italian-game"))
     assertEquals(wrongSelectorFamilyId, Some("spanish-opening"))
 
-  test("id field in serialized group matches OpeningGroupId value"):
+  test("id field in serialized group maps to _id"):
     val testGroup = OpeningGroup(
       id = giuocoPianoId,
       name = "Giuoco Piano",
@@ -118,7 +118,9 @@ class OpeningGroupRepoTest extends munit.FunSuite:
 
     val bson = summon[BSONDocumentHandler[OpeningGroup]].writeTry(testGroup).get
 
-    // The id field is serialized as "id", not "_id" (MongoDB layer handles _id mapping)
-    val idInBson = bson.getAsOpt[String]("id")
+    // @Key("_id") annotation maps id to _id, required for coll.byId queries
+    val idInBson = bson.getAsOpt[String]("_id")
     assertEquals(idInBson, Some(giuocoPianoId.value))
     assertEquals(idInBson, Some("giuoco-piano"))
+    // Verify "id" field does NOT exist (it's mapped to "_id")
+    assertEquals(bson.getAsOpt[String]("id"), None)
