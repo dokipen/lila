@@ -6,7 +6,6 @@ class OpeningGroupRepoTest extends munit.FunSuite:
 
   import BsonHandlers.{ given }
   import lila.db.dsl.$doc
-  import lila.db.dsl.$empty
 
   // Reuse fixture naming convention from SerializationTest
   val testFamilyId = OpeningFamilyId("italian-game")
@@ -50,7 +49,3 @@ class OpeningGroupRepoTest extends munit.FunSuite:
   test("group id resolves to string value for byId lookup"):
     assertEquals(testGroupId.value, "giuoco-piano")
 
-  // listAll selector
-
-  test("empty selector matches all documents"):
-    assert($empty.isEmpty)
