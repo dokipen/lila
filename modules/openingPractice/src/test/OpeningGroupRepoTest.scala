@@ -8,119 +8,49 @@ class OpeningGroupRepoTest extends munit.FunSuite:
   import lila.db.dsl.$doc
   import lila.db.dsl.$empty
 
-  // Test fixtures
-  val italianFamilyId = OpeningFamilyId("italian-game")
-  val spanishFamilyId = OpeningFamilyId("spanish-opening")
-  val giuocoPianoId = OpeningGroupId("giuoco-piano")
-  val evansGambitId = OpeningGroupId("evans-gambit")
+  // Reuse fixture naming convention from SerializationTest
+  val testFamilyId = OpeningFamilyId("italian-game")
+  val testGroupId = OpeningGroupId("giuoco-piano")
+  val testLineId1 = OpeningLineId("classical-variation")
 
-  // Tests for findByFamily query selector
+  val testGroup = OpeningGroup(
+    id = testGroupId,
+    name = "Giuoco Piano",
+    familyId = testFamilyId,
+    tier = 1,
+    lines = NonEmptyList.of(testLineId1),
+    color = chess.Color.White,
+    prerequisites = List.empty
+  )
 
-  test("family query selector uses correct field name"):
-    val selector = $doc("familyId" -> italianFamilyId)
-    val familyValue = selector.getAsOpt[String]("familyId")
-    assertEquals(familyValue, Some("italian-game"))
+  // findByFamily selector
 
-  test("family query selector serializes different family IDs"):
-    val selector1 = $doc("familyId" -> italianFamilyId)
-    val selector2 = $doc("familyId" -> spanishFamilyId)
+  test("family selector uses correct field name and value"):
+    val selector = $doc("familyId" -> testFamilyId)
+    assertEquals(selector.getAsOpt[String]("familyId"), Some("italian-game"))
 
-    assertEquals(selector1.getAsOpt[String]("familyId"), Some("italian-game"))
-    assertEquals(selector2.getAsOpt[String]("familyId"), Some("spanish-opening"))
-
-  test("family query selector produces BSONDocument"):
-    val selector = $doc("familyId" -> italianFamilyId)
-    assert(selector.isInstanceOf[BSONDocument])
-    assert(selector.contains("familyId"))
-
-  // Tests for findById (uses coll.byId which queries on _id field)
-
-  test("group id resolves to string value"):
-    assertEquals(giuocoPianoId.value, "giuoco-piano")
-    assertEquals(evansGambitId.value, "evans-gambit")
-
-  test("group id can be used as document key"):
-    // byId uses the string value as _id
-    val idValue: String = giuocoPianoId.value
-    assertEquals(idValue, "giuoco-piano")
-
-  test("different group ids have different string values"):
-    assert(giuocoPianoId.value != evansGambitId.value)
-
-  // Tests for listAll query (uses $empty)
-
-  test("empty selector for listAll"):
-    val selector = $empty
-    assert(selector.isEmpty)
-
-  test("empty selector is a BSONDocument"):
-    val selector = $empty
-    assert(selector.isInstanceOf[BSONDocument])
-    assertEquals(selector.elements.size, 0)
-
-  // Integration tests: verify selectors work with BSON handlers
-
-  test("familyId selector can match serialized OpeningGroup"):
-    val testGroup = OpeningGroup(
-      id = giuocoPianoId,
-      name = "Giuoco Piano",
-      familyId = italianFamilyId,
-      tier = 1,
-      lines = NonEmptyList.of(OpeningLineId("classical")),
-      color = chess.Color.White,
-      prerequisites = List.empty
-    )
-
-    // Serialize the group
+  test("family selector matches serialized group"):
     val bson = summon[BSONDocumentHandler[OpeningGroup]].writeTry(testGroup).get
+    val selectorValue = $doc("familyId" -> testFamilyId).getAsOpt[String]("familyId")
+    val documentValue = bson.getAsOpt[String]("familyId")
+    assertEquals(selectorValue, documentValue)
 
-    // Verify the familyId field matches our selector
-    val familyIdInBson = bson.getAsOpt[String]("familyId")
-    assertEquals(familyIdInBson, Some("italian-game"))
-
-    // Verify our selector would match this document
-    val selector = $doc("familyId" -> italianFamilyId)
-    val selectorFamilyId = selector.getAsOpt[String]("familyId")
-    assertEquals(selectorFamilyId, familyIdInBson)
-
-  test("familyId selector does not match different family"):
-    val testGroup = OpeningGroup(
-      id = giuocoPianoId,
-      name = "Giuoco Piano",
-      familyId = italianFamilyId,
-      tier = 1,
-      lines = NonEmptyList.of(OpeningLineId("classical")),
-      color = chess.Color.White,
-      prerequisites = List.empty
-    )
-
+  test("family selector does not match different family"):
     val bson = summon[BSONDocumentHandler[OpeningGroup]].writeTry(testGroup).get
-    val familyIdInBson = bson.getAsOpt[String]("familyId")
+    val wrongValue = $doc("familyId" -> OpeningFamilyId("spanish")).getAsOpt[String]("familyId")
+    assert(bson.getAsOpt[String]("familyId") != wrongValue)
 
-    // Different family selector should not match
-    val wrongSelector = $doc("familyId" -> spanishFamilyId)
-    val wrongSelectorFamilyId = wrongSelector.getAsOpt[String]("familyId")
+  // findById / _id mapping
 
-    assert(familyIdInBson != wrongSelectorFamilyId)
-    assertEquals(familyIdInBson, Some("italian-game"))
-    assertEquals(wrongSelectorFamilyId, Some("spanish-opening"))
-
-  test("id field in serialized group maps to _id"):
-    val testGroup = OpeningGroup(
-      id = giuocoPianoId,
-      name = "Giuoco Piano",
-      familyId = italianFamilyId,
-      tier = 1,
-      lines = NonEmptyList.of(OpeningLineId("classical")),
-      color = chess.Color.White,
-      prerequisites = List.empty
-    )
-
+  test("@Key maps id to _id in BSON"):
     val bson = summon[BSONDocumentHandler[OpeningGroup]].writeTry(testGroup).get
-
-    // @Key("_id") annotation maps id to _id, required for coll.byId queries
-    val idInBson = bson.getAsOpt[String]("_id")
-    assertEquals(idInBson, Some(giuocoPianoId.value))
-    assertEquals(idInBson, Some("giuoco-piano"))
-    // Verify "id" field does NOT exist (it's mapped to "_id")
+    assertEquals(bson.getAsOpt[String]("_id"), Some("giuoco-piano"))
     assertEquals(bson.getAsOpt[String]("id"), None)
+
+  test("group id resolves to string value for byId lookup"):
+    assertEquals(testGroupId.value, "giuoco-piano")
+
+  // listAll selector
+
+  test("empty selector matches all documents"):
+    assert($empty.isEmpty)
